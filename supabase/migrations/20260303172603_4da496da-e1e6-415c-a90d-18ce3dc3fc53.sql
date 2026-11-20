@@ -1,0 +1,1 @@
+ALTER TABLE public.grades ADD COLUMN work_type_id uuid REFERENCES public.work_types(id) ON DELETE SET NULL DEFAULT NULL;

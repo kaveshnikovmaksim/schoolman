@@ -1,0 +1,127 @@
+import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { useQuery } from "@tanstack/react-query";
+import { useCurrentTeacher, useTeacherDisplayDefaults } from "@/hooks/useSchoolData";
+import { displayClass } from "@/lib/displayDefaults";
+
+interface TeacherSubject {
+  id: string;
+  name: string;
+  pending_removal: boolean;
+}
+
+interface TeacherContextType {
+  teacherId: string | null;
+  selectedClassId: string;
+  setSelectedClassId: (id: string) => void;
+  selectedSubjectId: string;
+  setSelectedSubjectId: (id: string) => void;
+  teacherClasses: any[] | undefined;
+  teacherSubjects: TeacherSubject[] | undefined; // only ACTIVE (non-pending) subjects
+  pendingSubjects: TeacherSubject[] | undefined; // subjects awaiting admin final decision
+  allTeacherSubjects: TeacherSubject[] | undefined; // active + pending (for the "submit request" UI)
+  isCurrentSubjectPending: boolean; // true if selected subject is pending_removal (read-only mode)
+  isLoading: boolean;
+}
+
+const TeacherContext = createContext<TeacherContextType | null>(null);
+
+export function useTeacherContext() {
+  const ctx = useContext(TeacherContext);
+  if (!ctx) throw new Error("useTeacherContext must be used within TeacherProvider");
+  return ctx;
+}
+
+export function TeacherProvider({ children }: { children: ReactNode }) {
+  const { data: currentTeacher, isLoading: teacherLoading } = useCurrentTeacher();
+  const teacherId = currentTeacher?.id ?? null;
+  const defaults = useTeacherDisplayDefaults();
+  const [selectedClassId, setSelectedClassId] = useState("");
+  const [selectedSubjectId, setSelectedSubjectId] = useState("");
+
+  // Fetch teacher's classes
+  const { data: teacherClasses, isLoading: classesLoading } = useQuery({
+    queryKey: ["teacher_classes_list", teacherId],
+    queryFn: async () => {
+      if (!teacherId) return [];
+      const [tc, cs, own] = await Promise.all([
+        supabase.from("teacher_classes").select("classes(id, name)").eq("teacher_id", teacherId),
+        supabase.from("class_subjects").select("classes(id, name)").eq("teacher_id", teacherId),
+        supabase.from("classes").select("id, name").eq("teacher_id", teacherId),
+      ]);
+      if (tc.error) throw tc.error;
+      if (cs.error) throw cs.error;
+      if (own.error) throw own.error;
+      const map = new Map<string, any>();
+      [...(tc.data || []).map((r: any) => r.classes), ...(cs.data || []).map((r: any) => r.classes), ...(own.data || [])]
+        .filter(Boolean).forEach((c: any) => map.set(c.id, c));
+      return [...map.values()].sort((a, b) => a.name.localeCompare(b.name, "ru", { numeric: true }));
+    },
+    enabled: !!teacherId,
+  });
+
+  // Fetch teacher's subjects (with pending_removal flag)
+  const { data: allTeacherSubjects, isLoading: subjectsLoading } = useQuery({
+    queryKey: ["teacher_subjects_list", teacherId],
+    queryFn: async () => {
+      if (!teacherId) return [];
+      const { data, error } = await supabase
+        .from("teacher_subjects")
+        .select("subject_id, pending_removal, subjects(id, name)")
+        .eq("teacher_id", teacherId);
+      if (error) throw error;
+      return (data || [])
+        .map((ts: any) => ts.subjects ? { id: ts.subjects.id, name: ts.subjects.name, pending_removal: !!ts.pending_removal } : null)
+        .filter(Boolean) as TeacherSubject[];
+    },
+    enabled: !!teacherId,
+  });
+
+  const teacherSubjects = allTeacherSubjects?.filter(s => !s.pending_removal);
+  const pendingSubjects = allTeacherSubjects?.filter(s => s.pending_removal);
+
+  // Auto-select first class/subject (prefer ACTIVE subjects, fall back to pending if only those exist)
+  useEffect(() => {
+    if (teacherClasses?.length && !selectedClassId && !defaults.isPending) {
+      const initial = displayClass(teacherClasses, defaults.data?.find(r => r.teacher_id === teacherId)?.class_id);
+      if (initial) setSelectedClassId(initial.id);
+    }
+  }, [teacherClasses, selectedClassId, defaults.data, defaults.isPending, teacherId]);
+
+  useEffect(() => {
+    if (!allTeacherSubjects) return;
+    if (!selectedSubjectId) {
+      const first = teacherSubjects?.[0]?.id || allTeacherSubjects[0]?.id || "";
+      if (first) setSelectedSubjectId(first);
+      return;
+    }
+    // If selected subject no longer exists at all (was permanently removed) — switch
+    if (!allTeacherSubjects.find(s => s.id === selectedSubjectId)) {
+      setSelectedSubjectId(teacherSubjects?.[0]?.id || allTeacherSubjects[0]?.id || "");
+    }
+  }, [allTeacherSubjects, teacherSubjects, selectedSubjectId]);
+
+  const isCurrentSubjectPending = !!allTeacherSubjects?.find(
+    s => s.id === selectedSubjectId && s.pending_removal
+  );
+
+  return (
+    <TeacherContext.Provider
+      value={{
+        teacherId,
+        selectedClassId,
+        setSelectedClassId,
+        selectedSubjectId,
+        setSelectedSubjectId,
+        teacherClasses,
+        teacherSubjects,
+        pendingSubjects,
+        allTeacherSubjects,
+        isCurrentSubjectPending,
+        isLoading: teacherLoading || classesLoading || subjectsLoading,
+      }}
+    >
+      {children}
+    </TeacherContext.Provider>
+  );
+}

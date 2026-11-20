@@ -1,0 +1,1 @@
+ALTER TABLE public.grades DROP CONSTRAINT grades_student_id_subject_id_date_key;

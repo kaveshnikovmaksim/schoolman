@@ -1,0 +1,55 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1789755974514,
+      "tag": "0000_create_class_schedule",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1789844592113,
+      "tag": "0001_add_grade_weight",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1789845063464,
+      "tag": "0002_scope_rls_read_policies",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1790013281054,
+      "tag": "0003_quarter_access_mode",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1790014299439,
+      "tag": "0004_journal_date_access",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1794507413051,
+      "tag": "0005_diary_comment_notification_history",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1794692338125,
+      "tag": "0006_school_display_defaults",
+      "breakpoints": true
+    }
+  ]
+}

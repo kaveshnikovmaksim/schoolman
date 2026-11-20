@@ -1,0 +1,1 @@
+ALTER TABLE public.work_types ALTER COLUMN subject_id DROP NOT NULL;
