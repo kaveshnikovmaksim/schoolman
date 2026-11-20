@@ -30,7 +30,7 @@ jobs:
       - name: Build
         env:
           VITE_SUPABASE_URL: https://hhpchrqujcnuwiljdwur.supabase.co
-          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_iP-X-oKzRR3-r4qcQpj3Dg_XvcTV2Za
           VITE_SUPABASE_PROJECT_ID: hhpchrqujcnuwiljdwur
         run: npm run build
       - name: SPA fallback
