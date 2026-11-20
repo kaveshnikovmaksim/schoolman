@@ -45,13 +45,22 @@ const Reports = () => {
   }, [allGrades, classId, activeQuarter]);
 
   const overall = useMemo(() => {
-    const values = filteredGrades.map((g: any) => g.value);
-    const avg = values.length ? (values.reduce((s: number, v: number) => s + v, 0) / values.length) : 0;
     const totalStudents = classId === "all" ? (students?.length || 0) : (students?.filter((s: any) => s.class_id === classId).length || 0);
-    const passing = values.length ? Math.round((values.filter((v: number) => v >= 3).length / values.length) * 100) : 0;
-    const quality = values.length ? Math.round((values.filter((v: number) => v >= 4).length / values.length) * 100) : 0;
-    const twos = values.filter((v: number) => v === 2).length;
-    return { avg: avg ? avg.toFixed(2) : "—", totalStudents, passing, quality, twos, count: values.length };
+    const byStudent = new Map<string, { sum: number; weight: number; twos: number }>();
+    filteredGrades.forEach((g: any) => {
+      const weight = Math.max(1, Math.min(3, Number(g.weight) || 1));
+      const current = byStudent.get(g.student_id) || { sum: 0, weight: 0, twos: 0 };
+      current.sum += g.value * weight;
+      current.weight += weight;
+      if (g.value === 2) current.twos++;
+      byStudent.set(g.student_id, current);
+    });
+    const means = [...byStudent.values()].map((item) => item.sum / item.weight);
+    const avg = means.length ? means.reduce((sum, value) => sum + value, 0) / means.length : 0;
+    const passing = means.length ? Math.round((means.filter((value) => value >= 3).length / means.length) * 100) : 0;
+    const quality = means.length ? Math.round((means.filter((value) => value >= 4).length / means.length) * 100) : 0;
+    const twos = [...byStudent.values()].reduce((sum, item) => sum + item.twos, 0);
+    return { avg: avg ? avg.toFixed(2) : "—", totalStudents, passing, quality, twos, count: filteredGrades.length };
   }, [filteredGrades, students, classId]);
 
   // Per-subject breakdown
@@ -76,9 +85,17 @@ const Reports = () => {
       const filtered = activeQuarter
         ? grades.filter((g: any) => isWithinInterval(parseISO(g.date), { start: parseISO(activeQuarter.start_date), end: parseISO(activeQuarter.end_date) }))
         : grades;
-      const values = filtered.map((g: any) => g.value);
-      const avg = values.length ? values.reduce((s: number, v: number) => s + v, 0) / values.length : 0;
-      const passing = values.length ? Math.round((values.filter((v: number) => v >= 3).length / values.length) * 100) : 0;
+      const byStudent = new Map<string, { sum: number; weight: number }>();
+      filtered.forEach((g: any) => {
+        const current = byStudent.get(g.student_id) || { sum: 0, weight: 0 };
+        const weight = Math.max(1, Math.min(3, Number(g.weight) || 1));
+        current.sum += g.value * weight;
+        current.weight += weight;
+        byStudent.set(g.student_id, current);
+      });
+      const means = [...byStudent.values()].map((item) => item.sum / item.weight);
+      const avg = means.length ? means.reduce((sum, value) => sum + value, 0) / means.length : 0;
+      const passing = means.length ? Math.round((means.filter((value) => value >= 3).length / means.length) * 100) : 0;
       const studentCount = students?.filter((s: any) => s.class_id === c.id).length || 0;
       return { name: c.name, avg: +avg.toFixed(2), passing, students: studentCount };
     }).filter((c: any) => c.avg > 0).sort((a, b) => b.avg - a.avg);
