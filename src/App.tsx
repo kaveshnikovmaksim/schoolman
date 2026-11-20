@@ -139,12 +139,12 @@ const App = () => (
       <Sonner />
       {MAINTENANCE_MODE ? (
         <Maintenance>
-          <BrowserRouter>
+          <BrowserRouter basename={import.meta.env.BASE_URL}>
             {isDiaryHost ? <DiaryOnlyRoutes /> : <MainRoutes />}
           </BrowserRouter>
         </Maintenance>
       ) : (
-        <BrowserRouter>
+        <BrowserRouter basename={import.meta.env.BASE_URL}>
           {isDiaryHost ? <DiaryOnlyRoutes /> : <MainRoutes />}
         </BrowserRouter>
       )}
