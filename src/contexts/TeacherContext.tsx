@@ -45,16 +45,22 @@ export function TeacherProvider({ children }: { children: ReactNode }) {
     queryFn: async () => {
       if (!teacherId) return [];
       const [tc, cs, own] = await Promise.all([
-        supabase.from("teacher_classes").select("classes(id, name)").eq("teacher_id", teacherId),
-        supabase.from("class_subjects").select("classes(id, name)").eq("teacher_id", teacherId),
+        supabase.from("teacher_classes").select("class_id").eq("teacher_id", teacherId),
+        supabase.from("class_subjects").select("class_id").eq("teacher_id", teacherId),
         supabase.from("classes").select("id, name").eq("teacher_id", teacherId),
       ]);
       if (tc.error) throw tc.error;
       if (cs.error) throw cs.error;
       if (own.error) throw own.error;
       const map = new Map<string, any>();
-      [...(tc.data || []).map((r: any) => r.classes), ...(cs.data || []).map((r: any) => r.classes), ...(own.data || [])]
-        .filter(Boolean).forEach((c: any) => map.set(c.id, c));
+      const linkedIds = [...(tc.data || []), ...(cs.data || [])].map((row: any) => row.class_id).filter(Boolean);
+      if (linkedIds.length) {
+        const { data: linkedClasses, error: linkedError } = await supabase
+          .from("classes").select("id, name").in("id", linkedIds);
+        if (linkedError) throw linkedError;
+        (linkedClasses || []).forEach((c: any) => map.set(c.id, c));
+      }
+      (own.data || []).forEach((c: any) => map.set(c.id, c));
       return [...map.values()].sort((a, b) => a.name.localeCompare(b.name, "ru", { numeric: true }));
     },
     enabled: !!teacherId,
@@ -67,12 +73,20 @@ export function TeacherProvider({ children }: { children: ReactNode }) {
       if (!teacherId) return [];
       const { data, error } = await supabase
         .from("teacher_subjects")
-        .select("subject_id, pending_removal, subjects(id, name)")
+        .select("subject_id, pending_removal")
         .eq("teacher_id", teacherId);
       if (error) throw error;
-      return (data || [])
-        .map((ts: any) => ts.subjects ? { id: ts.subjects.id, name: ts.subjects.name, pending_removal: !!ts.pending_removal } : null)
-        .filter(Boolean) as TeacherSubject[];
+      const ids = (data || []).map((row: any) => row.subject_id).filter(Boolean);
+      if (!ids.length) return [];
+      const { data: subjects, error: subjectsError } = await supabase
+        .from("subjects").select("id, name").in("id", ids);
+      if (subjectsError) throw subjectsError;
+      const names = new Map((subjects || []).map((subject: any) => [subject.id, subject.name]));
+      return (data || []).map((ts: any) => ({
+        id: ts.subject_id,
+        name: names.get(ts.subject_id) || "",
+        pending_removal: !!ts.pending_removal,
+      })).filter((subject: TeacherSubject) => subject.name) as TeacherSubject[];
     },
     enabled: !!teacherId,
   });
