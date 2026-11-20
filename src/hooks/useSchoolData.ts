@@ -92,12 +92,20 @@ export function useTeachers() {
   return useQuery({
     queryKey: ["teachers"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("teachers")
-        .select("*, teacher_subjects(subject_id, subjects(name)), teacher_classes(class_id, classes(name))")
-        .order("name");
+      const { data, error } = await supabase.from("teachers").select("*").order("name");
       if (error) throw error;
-      return data;
+      const ids = (data || []).map((teacher: any) => teacher.id);
+      const [subjectsResult, classesResult] = await Promise.all([
+        ids.length ? supabase.from("teacher_subjects").select("teacher_id, subject_id, pending_removal, subjects(id, name)").in("teacher_id", ids) : Promise.resolve({ data: [], error: null } as any),
+        ids.length ? supabase.from("teacher_classes").select("teacher_id, class_id, classes(id, name)").in("teacher_id", ids) : Promise.resolve({ data: [], error: null } as any),
+      ]);
+      if (subjectsResult.error) throw subjectsResult.error;
+      if (classesResult.error) throw classesResult.error;
+      return (data || []).map((teacher: any) => ({
+        ...teacher,
+        teacher_subjects: (subjectsResult.data || []).filter((row: any) => row.teacher_id === teacher.id),
+        teacher_classes: (classesResult.data || []).filter((row: any) => row.teacher_id === teacher.id),
+      }));
     },
   });
 }
@@ -192,12 +200,20 @@ export function useClasses() {
   return useQuery({
     queryKey: ["classes"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("classes")
-        .select("*, teachers(name), students(count)")
-        .order("name");
+      const { data, error } = await supabase.from("classes").select("*").order("name");
       if (error) throw error;
-      return data;
+      const teacherIds = [...new Set((data || []).map((row: any) => row.teacher_id).filter(Boolean))];
+      const classIds = (data || []).map((row: any) => row.id);
+      const [teachersResult, studentsResult] = await Promise.all([
+        teacherIds.length ? supabase.from("teachers").select("id, name").in("id", teacherIds) : Promise.resolve({ data: [], error: null } as any),
+        classIds.length ? supabase.from("students").select("id, class_id").in("class_id", classIds) : Promise.resolve({ data: [], error: null } as any),
+      ]);
+      if (teachersResult.error) throw teachersResult.error;
+      if (studentsResult.error) throw studentsResult.error;
+      const teachers = new Map((teachersResult.data || []).map((teacher: any) => [teacher.id, teacher]));
+      const counts = new Map<string, number>();
+      (studentsResult.data || []).forEach((student: any) => counts.set(student.class_id, (counts.get(student.class_id) || 0) + 1));
+      return (data || []).map((row: any) => ({ ...row, teachers: teachers.get(row.teacher_id) || null, students: { count: counts.get(row.id) || 0 } }));
     },
   });
 }
@@ -382,12 +398,19 @@ export function useClassSubjects(classId?: string) {
   return useQuery({
     queryKey: ["class_subjects", classId],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("class_subjects")
-        .select("*, subjects(name), teachers(name)")
-        .eq("class_id", classId!);
+      const { data, error } = await supabase.from("class_subjects").select("*").eq("class_id", classId!);
       if (error) throw error;
-      return data;
+      const subjectIds = [...new Set((data || []).map((row: any) => row.subject_id).filter(Boolean))];
+      const teacherIds = [...new Set((data || []).map((row: any) => row.teacher_id).filter(Boolean))];
+      const [subjectsResult, teachersResult] = await Promise.all([
+        subjectIds.length ? supabase.from("subjects").select("id, name").in("id", subjectIds) : Promise.resolve({ data: [], error: null } as any),
+        teacherIds.length ? supabase.from("teachers").select("id, name").in("id", teacherIds) : Promise.resolve({ data: [], error: null } as any),
+      ]);
+      if (subjectsResult.error) throw subjectsResult.error;
+      if (teachersResult.error) throw teachersResult.error;
+      const subjects = new Map((subjectsResult.data || []).map((row: any) => [row.id, row]));
+      const teachers = new Map((teachersResult.data || []).map((row: any) => [row.id, row]));
+      return (data || []).map((row: any) => ({ ...row, subjects: subjects.get(row.subject_id) || null, teachers: teachers.get(row.teacher_id) || null }));
     },
     enabled: !!classId,
   });
