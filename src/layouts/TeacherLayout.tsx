@@ -46,7 +46,7 @@ function ClassSubjectSelector({ compact = false }: { compact?: boolean }) {
     teacherClasses, teacherSubjects, pendingSubjects,
   } = useTeacherContext();
   const location = useLocation();
-  const hideSubject = location.pathname === "/teacher/homework";
+  const hideSubject = location.pathname === "/teacher/homework" || location.pathname === "/teacher/schedule";
 
   // Show active subjects first, then pending ones (still selectable, but read-only)
   const allSelectable = [...(teacherSubjects || []), ...(pendingSubjects || [])];
@@ -323,7 +323,9 @@ function DesktopLayout() {
           {/* Top tabs above the class/subject row, but only over the main content (not over sidebar) */}
           <TopTabs />
           <div className="h-14 border-b border-border bg-card flex items-center justify-between px-6 shrink-0">
-            <span className="text-sm text-muted-foreground font-medium">Класс и предмет:</span>
+            <span className="text-sm text-muted-foreground font-medium">
+              {location.pathname === "/teacher/schedule" ? "Класс:" : "Класс и предмет:"}
+            </span>
             <ClassSubjectSelector />
           </div>
           <div className="flex-1">
