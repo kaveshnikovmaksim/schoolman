@@ -240,27 +240,44 @@ function DesktopLayout() {
   // Expanded mode — no sidebar, but class/subject selector visible
   if (expanded) {
     return (
-      <div className="min-h-screen flex flex-col w-full">
-        <div className="h-12 border-b border-border bg-card flex items-center justify-between px-4 shrink-0">
-          <div className="flex items-center gap-3">
-            <GraduationCap className="w-6 h-6 text-primary shrink-0" />
-            <span className="text-base font-semibold text-foreground">Журнал</span>
-          </div>
-          <div className="flex items-center gap-3">
-            <ClassSubjectSelector />
-            <button
-              onClick={() => setExpanded(false)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-secondary hover:bg-secondary/80 text-muted-foreground transition-colors"
+      <div className="min-h-screen flex w-full">
+        <aside className="w-14 shrink-0 border-r border-border bg-sidebar text-sidebar-foreground flex flex-col items-center py-3 gap-2">
+          <GraduationCap className="w-6 h-6 text-sidebar-primary mb-2" />
+          {journalNavItems.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              title={item.label}
+              className={({ isActive }) => cn(
+                "w-10 h-10 rounded-lg flex items-center justify-center transition-colors",
+                isActive ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+              )}
             >
-              <Minimize2 className="w-3.5 h-3.5" />
-              Быстрый режим
-            </button>
+              <item.icon className="w-5 h-5" />
+            </NavLink>
+          ))}
+        </aside>
+        <div className="min-h-screen flex flex-col flex-1 min-w-0">
+          <div className="h-12 border-b border-border bg-card flex items-center justify-between px-4 shrink-0">
+            <div className="flex items-center gap-3">
+              <span className="text-base font-semibold text-foreground">Журнал</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <ClassSubjectSelector />
+              <button
+                onClick={() => setExpanded(false)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-secondary hover:bg-secondary/80 text-muted-foreground transition-colors"
+              >
+                <Minimize2 className="w-3.5 h-3.5" />
+                Быстрый режим
+              </button>
+            </div>
           </div>
+          <TopTabs />
+          <main className="flex-1 overflow-auto">
+            <Outlet />
+          </main>
         </div>
-        <TopTabs />
-        <main className="flex-1 overflow-auto">
-          <Outlet />
-        </main>
       </div>
     );
   }
