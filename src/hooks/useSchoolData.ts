@@ -256,7 +256,7 @@ export function useStudents(classId?: string) {
   return useQuery({
     queryKey: ["students", classId],
     queryFn: async () => {
-      let q = supabase.from("students").select("*, classes(name)").order("name");
+      let q = supabase.from("students").select("*").order("name");
       if (classId) q = q.eq("class_id", classId);
       const { data, error } = await q;
       if (error) throw error;
@@ -270,7 +270,7 @@ export function useAllStudents() {
   return useQuery({
     queryKey: ["students", "all"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("students").select("*, classes(name)").order("name");
+      const { data, error } = await supabase.from("students").select("*").order("name");
       if (error) throw error;
       return data;
     },
@@ -618,12 +618,18 @@ export function useGrades(classId?: string, subjectId?: string) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("grades")
-        .select("*, work_types(name, short_name)")
+        .select("*")
         .eq("class_id", classId!)
         .eq("subject_id", subjectId!)
         .order("date");
       if (error) throw error;
-      return data;
+      const workTypeIds = [...new Set((data || []).map((grade: any) => grade.work_type_id).filter(Boolean))];
+      if (!workTypeIds.length) return data || [];
+      const { data: workTypes, error: workTypesError } = await supabase
+        .from("work_types").select("id, name, short_name").in("id", workTypeIds);
+      if (workTypesError) throw workTypesError;
+      const workTypeMap = new Map((workTypes || []).map((workType: any) => [workType.id, workType]));
+      return (data || []).map((grade: any) => ({ ...grade, work_types: workTypeMap.get(grade.work_type_id) || null }));
     },
     enabled: !!classId && !!subjectId,
   });
