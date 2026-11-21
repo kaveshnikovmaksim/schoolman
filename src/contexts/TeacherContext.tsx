@@ -96,7 +96,7 @@ export function TeacherProvider({ children }: { children: ReactNode }) {
 
   // Auto-select first class/subject (prefer ACTIVE subjects, fall back to pending if only those exist)
   useEffect(() => {
-    if (teacherClasses?.length && !selectedClassId && !defaults.isPending) {
+    if (teacherClasses?.length && !selectedClassId) {
       const initial = displayClass(teacherClasses, defaults.data?.find(r => r.teacher_id === teacherId)?.class_id);
       if (initial) setSelectedClassId(initial.id);
     }
