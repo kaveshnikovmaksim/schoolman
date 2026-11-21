@@ -96,15 +96,25 @@ export function useTeachers() {
       if (error) throw error;
       const ids = (data || []).map((teacher: any) => teacher.id);
       const [subjectsResult, classesResult] = await Promise.all([
-        ids.length ? supabase.from("teacher_subjects").select("teacher_id, subject_id, pending_removal, subjects(id, name)").in("teacher_id", ids) : Promise.resolve({ data: [], error: null } as any),
-        ids.length ? supabase.from("teacher_classes").select("teacher_id, class_id, classes(id, name)").in("teacher_id", ids) : Promise.resolve({ data: [], error: null } as any),
+        ids.length ? supabase.from("teacher_subjects").select("teacher_id, subject_id, pending_removal").in("teacher_id", ids) : Promise.resolve({ data: [], error: null } as any),
+        ids.length ? supabase.from("teacher_classes").select("teacher_id, class_id").in("teacher_id", ids) : Promise.resolve({ data: [], error: null } as any),
       ]);
       if (subjectsResult.error) throw subjectsResult.error;
       if (classesResult.error) throw classesResult.error;
+      const subjectIds = [...new Set((subjectsResult.data || []).map((row: any) => row.subject_id).filter(Boolean))];
+      const classIds = [...new Set((classesResult.data || []).map((row: any) => row.class_id).filter(Boolean))];
+      const [subjectNames, classNames] = await Promise.all([
+        subjectIds.length ? supabase.from("subjects").select("id, name").in("id", subjectIds) : Promise.resolve({ data: [], error: null } as any),
+        classIds.length ? supabase.from("classes").select("id, name").in("id", classIds) : Promise.resolve({ data: [], error: null } as any),
+      ]);
+      if (subjectNames.error) throw subjectNames.error;
+      if (classNames.error) throw classNames.error;
+      const subjects = new Map((subjectNames.data || []).map((row: any) => [row.id, row]));
+      const classes = new Map((classNames.data || []).map((row: any) => [row.id, row]));
       return (data || []).map((teacher: any) => ({
         ...teacher,
-        teacher_subjects: (subjectsResult.data || []).filter((row: any) => row.teacher_id === teacher.id),
-        teacher_classes: (classesResult.data || []).filter((row: any) => row.teacher_id === teacher.id),
+        teacher_subjects: (subjectsResult.data || []).filter((row: any) => row.teacher_id === teacher.id).map((row: any) => ({ ...row, subjects: subjects.get(row.subject_id) || null })),
+        teacher_classes: (classesResult.data || []).filter((row: any) => row.teacher_id === teacher.id).map((row: any) => ({ ...row, classes: classes.get(row.class_id) || null })),
       }));
     },
   });
@@ -816,9 +826,13 @@ export function useAllWorkTypes() {
   return useQuery({
     queryKey: ["work_types"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("work_types").select("*, subjects(name)").order("name");
+      const { data, error } = await supabase.from("work_types").select("*").order("name");
       if (error) throw error;
-      return data;
+      const ids = [...new Set((data || []).map((row: any) => row.subject_id).filter(Boolean))];
+      const { data: subjects, error: subjectsError } = ids.length ? await supabase.from("subjects").select("id, name").in("id", ids) : { data: [], error: null } as any;
+      if (subjectsError) throw subjectsError;
+      const map = new Map((subjects || []).map((row: any) => [row.id, row]));
+      return (data || []).map((row: any) => ({ ...row, subjects: map.get(row.subject_id) || null }));
     },
   });
 }
