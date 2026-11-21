@@ -16,6 +16,11 @@ async function sendMessage(chatId: string, text: string) {
 }
 
 Deno.serve(async (request) => {
+  if (request.method === "GET") {
+    const webhookUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/telegram-webhook`;
+    const result = await fetch(`${api}/setWebhook?url=${encodeURIComponent(webhookUrl)}`);
+    return new Response(await result.text(), { headers: { "content-type": "application/json" } });
+  }
   if (request.method !== "POST") return new Response("ok");
   const update = await request.json();
   const message = update.message;
