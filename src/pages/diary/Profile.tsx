@@ -29,6 +29,8 @@ const DiaryProfile = () => {
   const { account } = useDiaryAuth();
   const navigate = useNavigate();
   const [name, setName] = useState("");
+  const [telegramLink, setTelegramLink] = useState<string | null>(null);
+  const [telegramLoading, setTelegramLoading] = useState(false);
 
   useEffect(() => {
     if (!studentId) return;
@@ -39,6 +41,23 @@ const DiaryProfile = () => {
     await supabase.auth.signOut();
     localStorage.removeItem("diary_selected_student");
     navigate("/diary/login", { replace: true });
+  };
+
+  const connectTelegram = async () => {
+    if (!studentId) return;
+    setTelegramLoading(true);
+    const code = crypto.randomUUID().replaceAll("-", "").slice(0, 16);
+    const { error } = await supabase.from("telegram_link_codes").insert({
+      code,
+      student_id: studentId,
+      expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+    });
+    if (error) {
+      window.alert("Не удалось создать ссылку подключения. Попробуйте ещё раз.");
+    } else {
+      setTelegramLink(`https://t.me/schoolman_diary_ai?start=${code}`);
+    }
+    setTelegramLoading(false);
   };
 
   return (
@@ -81,6 +100,18 @@ const DiaryProfile = () => {
           ))}
         </div>
       ))}
+
+      <div className="bg-white rounded-2xl p-4 space-y-3">
+        <div className="font-medium text-slate-900">Уведомления о домашних заданиях</div>
+        <div className="text-sm text-slate-500">Подключите Telegram, чтобы получать сообщения о новых заданиях.</div>
+        {telegramLink ? (
+          <a href={telegramLink} target="_blank" rel="noreferrer" className="block w-full rounded-xl bg-blue-600 py-3 text-center font-medium text-white">Открыть Telegram</a>
+        ) : (
+          <button onClick={connectTelegram} disabled={telegramLoading} className="w-full rounded-xl bg-blue-600 py-3 font-medium text-white disabled:opacity-50">
+            {telegramLoading ? "Создаём ссылку…" : "Подключить Telegram"}
+          </button>
+        )}
+      </div>
 
       {/* Выход */}
       <button
