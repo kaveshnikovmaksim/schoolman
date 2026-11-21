@@ -11,18 +11,36 @@ export default function AdminRequests() {
 
   const loadAll = async () => {
     const [reqRes, linkRes] = await Promise.all([
-      supabase
-        .from("teacher_requests")
-        .select("*, teachers(name, email)")
-        .order("created_at", { ascending: false }),
+      supabase.from("teacher_requests").select("*").order("created_at", { ascending: false }),
       // Source of truth for "access management": any teacher_subjects row marked pending_removal
       supabase
         .from("teacher_subjects")
-        .select("teacher_id, subject_id, pending_removal, teachers(id, name, email), subjects(id, name)")
+        .select("teacher_id, subject_id, pending_removal")
         .eq("pending_removal", true),
     ]);
-    if (reqRes.data) setRequests(reqRes.data);
-    if (linkRes.data) setPendingSubjectLinks(linkRes.data);
+    if (reqRes.error || linkRes.error) {
+      toast.error("Не удалось загрузить заявки");
+      setLoading(false);
+      return;
+    }
+    const teacherIds = [...new Set([
+      ...(reqRes.data || []).map((row: any) => row.teacher_id),
+      ...(linkRes.data || []).map((row: any) => row.teacher_id),
+    ].filter(Boolean))];
+    const subjectIds = [...new Set((linkRes.data || []).map((row: any) => row.subject_id).filter(Boolean))];
+    const [teachersResult, subjectsResult] = await Promise.all([
+      teacherIds.length ? supabase.from("teachers").select("id, name, email").in("id", teacherIds) : Promise.resolve({ data: [], error: null } as any),
+      subjectIds.length ? supabase.from("subjects").select("id, name").in("id", subjectIds) : Promise.resolve({ data: [], error: null } as any),
+    ]);
+    if (teachersResult.error || subjectsResult.error) {
+      toast.error("Не удалось загрузить данные заявок");
+      setLoading(false);
+      return;
+    }
+    const teachers = new Map((teachersResult.data || []).map((row: any) => [row.id, row]));
+    const subjects = new Map((subjectsResult.data || []).map((row: any) => [row.id, row]));
+    setRequests((reqRes.data || []).map((row: any) => ({ ...row, teachers: teachers.get(row.teacher_id) || null })));
+    setPendingSubjectLinks((linkRes.data || []).map((row: any) => ({ ...row, teachers: teachers.get(row.teacher_id) || null, subjects: subjects.get(row.subject_id) || null })));
     setLoading(false);
   };
 
