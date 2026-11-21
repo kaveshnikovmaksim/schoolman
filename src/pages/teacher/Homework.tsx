@@ -109,15 +109,18 @@ const Homework = () => {
         if (error) throw error;
       } else {
         if (!teacherId) throw new Error("Учитель не найден");
-        const { error } = await supabase.from("homework").insert({
+        const { data: created, error } = await supabase.from("homework").insert({
           teacher_id: teacherId,
           subject_id: selectedSubject,
           class_id: selectedClassId,
           title,
           description,
           due_date: dueDate,
-        });
+        }).select("id").single();
         if (error) throw error;
+        if (created?.id) {
+          await supabase.functions.invoke("notify-homework", { body: { homework_id: created.id } });
+        }
       }
     },
     onSuccess: () => {
