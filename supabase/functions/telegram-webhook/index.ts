@@ -43,13 +43,18 @@ Deno.serve(async (request) => {
       await sendMessage(chatId, "Ссылка подключения устарела. Создайте новую ссылку в дневнике.");
       return new Response("ok");
     }
-    await supabase.from("telegram_student_links").upsert({
+    await supabase.from("telegram_student_links").delete().eq("chat_id", chatId);
+    const { error: linkError } = await supabase.from("telegram_student_links").upsert({
       student_id: linkCode.student_id,
       chat_id: chatId,
       username: message.chat.username ?? null,
       enabled: true,
       updated_at: new Date().toISOString(),
     }, { onConflict: "student_id" });
+    if (linkError) {
+      await sendMessage(chatId, "Не удалось подключить Telegram. Откройте новую ссылку в дневнике и попробуйте ещё раз.");
+      return new Response("ok");
+    }
     await supabase.from("telegram_link_codes").update({ used_at: new Date().toISOString() }).eq("code", code);
     await sendMessage(chatId, "Telegram подключён. Вы будете получать уведомления о новых домашних заданиях.");
   }
