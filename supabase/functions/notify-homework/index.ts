@@ -9,9 +9,7 @@ Deno.serve(async (request) => {
   if (!homework_id) return new Response(JSON.stringify({ error: "homework_id required" }), { status: 400 });
   const { data: homework, error } = await supabase.from("homework").select("id, title, description, due_date, class_id, subjects(name), classes(name)").eq("id", homework_id).single();
   if (error || !homework) return new Response(JSON.stringify({ error: error?.message || "not found" }), { status: 404 });
-  const { data: students } = await supabase.from("students").select("id").eq("class_id", homework.class_id);
-  const ids = (students || []).map((student) => student.id);
-  const { data: links } = ids.length ? await supabase.from("telegram_student_links").select("chat_id").in("student_id", ids).eq("enabled", true) : { data: [] };
+  const { data: links } = await supabase.from("telegram_class_links").select("chat_id").eq("class_id", homework.class_id).eq("enabled", true);
   const text = `📚 Новое домашнее задание\n\n${(homework.subjects as any)?.name || "Предмет"} · ${(homework.classes as any)?.name || "Класс"}\nСрок: ${homework.due_date}\n\n${homework.title}${homework.description ? `\n${homework.description}` : ""}`;
   let sent = 0;
   for (const link of links || []) {
