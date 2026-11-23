@@ -33,7 +33,7 @@ const DiaryProfile = () => {
   const [telegramLoading, setTelegramLoading] = useState(false);
 
   useEffect(() => {
-    if (!studentId) return;
+    if (!studentId || !account?.classId) return;
     supabase.from("students").select("name").eq("id", studentId).maybeSingle().then(({ data }) => setName(data?.name ?? ""));
   }, [studentId]);
 
@@ -47,9 +47,9 @@ const DiaryProfile = () => {
     if (!studentId) return;
     setTelegramLoading(true);
     const code = crypto.randomUUID().replaceAll("-", "").slice(0, 16);
-    const { error } = await supabase.from("telegram_link_codes").insert({
+    const { error } = await supabase.from("telegram_class_link_codes").insert({
       code,
-      student_id: studentId,
+      class_id: account?.classId,
       expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
     });
     if (error) {

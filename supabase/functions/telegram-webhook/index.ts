@@ -34,6 +34,21 @@ Deno.serve(async (request) => {
       await sendMessage(chatId, "Откройте ссылку подключения из дневника, чтобы привязать Telegram.");
       return new Response("ok");
     }
+    const { data: classCode } = await supabase
+      .from("telegram_class_link_codes")
+      .select("code, class_id, expires_at, used_at")
+      .eq("code", code)
+      .maybeSingle();
+    if (classCode) {
+      if (classCode.used_at || new Date(classCode.expires_at) < new Date()) {
+        await sendMessage(chatId, "Ссылка подключения устарела. Создайте новую ссылку в дневнике.");
+        return new Response("ok");
+      }
+      await supabase.from("telegram_class_links").upsert({ class_id: classCode.class_id, chat_id: chatId, username: message.chat.username ?? null, enabled: true, updated_at: new Date().toISOString() }, { onConflict: "class_id,chat_id" });
+      await supabase.from("telegram_class_link_codes").update({ used_at: new Date().toISOString() }).eq("code", code);
+      await sendMessage(chatId, "Telegram подключён к классу. Вы будете получать домашние задания этого класса.");
+      return new Response("ok");
+    }
     const { data: linkCode } = await supabase
       .from("telegram_link_codes")
       .select("code, student_id, expires_at, used_at")
